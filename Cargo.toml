@@ -1,0 +1,17 @@
+[package]
+name = "katzenpost_client"
+version = "0.0.1"
+authors = ["David Stainton <dstainton415@gmail.com>"]
+edition = "2018"
+homepage = "https://github.com/sphinx-cryptography/katzenpost_client"
+repository = "https://github.com/sphinx-cryptography/katzenpost_client"
+documentation = "https://docs.rs/mix_link/"
+readme = "README.md"
+keywords = ["cryptography", "mixnet", "client", "mix network", "anonymous"]
+license = "AGPL-3.0-only"
+
+[dependencies]
+mix_link = { version = "0.2.0", git = "https://github.com/sphinx-cryptography/mix_link.git", branch = "master" }
+x25519-dalek-ng = { git = "https://github.com/sphinx-cryptography/x25519-dalek-ng.git", branch = "master" }
+epoch = "0.0.2"
+
