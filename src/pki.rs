@@ -60,16 +60,13 @@ impl Client {
         }
     }
 
-    pub fn connect(mut self) -> Result<Self, ConnectError> {
-        self.session = Some(Session::new(self.session_config.clone(), true)?);
-        self.session.as_mut().unwrap().initialize(TcpStream::connect(self.server_addr.clone())?)?;
-        let mut session = self.session.unwrap().into_transport_mode()?;
+    pub fn connect(mut self) -> Result<(), ConnectError> {
+        let mut session = Session::new(self.session_config.clone(), true)?;
+        session.initialize(TcpStream::connect(self.server_addr.clone())?)?;
+        session = session.into_transport_mode()?;
         session.finalize_handshake()?;
-        Ok(Self {
-            server_addr: self.server_addr,
-            session_config: self.session_config,
-            session: Some(session),
-        })
+        self.session = Some(session);
+        Ok(())
     }
 
     pub fn close (&mut self) -> Result<(), ()> {
