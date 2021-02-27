@@ -14,4 +14,5 @@ license = "AGPL-3.0-only"
 mix_link = { version = "0.2.0", git = "https://github.com/sphinx-cryptography/mix_link.git", branch = "master" }
 x25519-dalek-ng = { git = "https://github.com/sphinx-cryptography/x25519-dalek-ng.git", branch = "master" }
 epoch = "0.0.2"
+socks = "0.3.3"
 retry = "1.2.0"

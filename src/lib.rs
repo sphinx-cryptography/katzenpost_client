@@ -19,7 +19,7 @@
 //!
 
 
-pub mod pki;
+pub mod client;
 pub mod errors;
 
 

@@ -24,12 +24,14 @@
 
 extern crate mix_link;
 extern crate x25519_dalek_ng;
+extern crate socks;
 extern crate retry;
 
 use std::str::FromStr;
 use std::net::{SocketAddr, TcpStream};
 use std::time::Duration;
 
+use socks::Socks5Stream;
 use retry::{retry, OperationResult};
 use retry::delay::Exponential;
 
@@ -43,6 +45,7 @@ use crate::errors::{ConnectError};
 
 
 pub struct Client {
+    socks_proxy_addr: Option<String>,
     server_addr: String,
     session_config: SessionConfig,
     session: Option<Session>,
@@ -60,32 +63,40 @@ impl Client {
             additional_data: vec![],
         };
         Client {
+            socks_proxy_addr: None,
             server_addr: server_addr,
             session_config: session_config,
             session: None,
         }
     }
 
+    fn server_stream(&self) -> Result<TcpStream, ConnectError> {
+        let target = SocketAddr::from_str(&self.server_addr)?;
+        if let Some(proxy_addr) = &self.socks_proxy_addr {
+            return Ok(Socks5Stream::connect(SocketAddr::from_str(proxy_addr)?, target)?.into_inner());
+        }
+        return Ok(TcpStream::connect_timeout(&target, Duration::from_secs(45))?)
+    }
+
     fn connect(&mut self) -> Result<(), ConnectError> {
         // Connect within 45 seconds.
         let mut session = Session::new(self.session_config.clone(), true)?;
-        session.initialize(TcpStream::connect_timeout(&SocketAddr::from_str(&self.server_addr)?, Duration::from_secs(45))?)?;
+        session.initialize(self.server_stream()?)?;
         session = session.into_transport_mode()?;
         session.finalize_handshake()?;
         self.session = Some(session);
         Ok(())
     }
 
-    pub fn retry_connect(&mut self) -> Result<(), ConnectError> {
-        let ret = retry(Exponential::from(Duration::from_secs(5)), || {
+    pub fn retry_connect(&mut self) -> Result<(), retry::Error<ConnectError>> {
+        retry(Exponential::from(Duration::from_secs(5)).take(5), || {
             match self.connect() {
                 Err(ConnectError::IOError(x)) => OperationResult::Retry(ConnectError::IOError(x)),
                 Err(ConnectError::HandshakeError(x)) => OperationResult::Err(ConnectError::HandshakeError(x)),
                 Err(ConnectError::AddrParseError(x)) => OperationResult::Err(ConnectError::AddrParseError(x)),
                 Ok(()) => OperationResult::Ok(()),
             }
-        }).unwrap();
-        Ok(ret)
+        })
     }
 
     pub fn close (&mut self) -> Result<(), ()> {
