@@ -16,23 +16,24 @@
 
 use std::error::{Error};
 use std::fmt;
+use std::net::AddrParseError;
 
 use mix_link::errors::HandshakeError;
 
 
 #[derive(Debug)]
 pub enum ConnectError {
-    ConnectFailure,
     HandshakeError(HandshakeError),
-    IOError(std::io::Error)
+    IOError(std::io::Error),
+    AddrParseError(AddrParseError),
 }
 
 impl fmt::Display for ConnectError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            ConnectError::ConnectFailure => write!(f, "Failure to connect."),
             ConnectError::HandshakeError(_) => write!(f, "Handshake failure."),
             ConnectError::IOError(x) => x.fmt(f),
+            ConnectError::AddrParseError(x) => x.fmt(f),
         }
     }
 }
@@ -44,7 +45,7 @@ impl Error for ConnectError {
 
     fn cause(&self) -> Option<&dyn Error> {
         match self {
-            ConnectError::ConnectFailure => None,
+            ConnectError::AddrParseError(x) => x.source(),
             ConnectError::HandshakeError(x) => x.source(),
             ConnectError::IOError(x) => x.source(),
         }
@@ -61,5 +62,11 @@ impl From<HandshakeError> for ConnectError {
 impl From<std::io::Error> for ConnectError {
     fn from(error: std::io::Error) -> Self {
         ConnectError::IOError(error)
+    }
+}
+
+impl From<AddrParseError> for ConnectError {
+    fn from(error: AddrParseError) -> Self {
+        ConnectError::AddrParseError(error)
     }
 }

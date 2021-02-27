@@ -24,8 +24,14 @@
 
 extern crate mix_link;
 extern crate x25519_dalek_ng;
+extern crate retry;
 
-use std::net::TcpStream;
+use std::str::FromStr;
+use std::net::{SocketAddr, TcpStream};
+use std::time::Duration;
+
+use retry::{retry, OperationResult};
+use retry::delay::Exponential;
 
 use x25519_dalek_ng::{PublicKey, StaticSecret};
 
@@ -60,13 +66,26 @@ impl Client {
         }
     }
 
-    pub fn connect(mut self) -> Result<(), ConnectError> {
+    fn connect(&mut self) -> Result<(), ConnectError> {
+        // Connect within 45 seconds.
         let mut session = Session::new(self.session_config.clone(), true)?;
-        session.initialize(TcpStream::connect(self.server_addr.clone())?)?;
+        session.initialize(TcpStream::connect_timeout(&SocketAddr::from_str(&self.server_addr)?, Duration::from_secs(45))?)?;
         session = session.into_transport_mode()?;
         session.finalize_handshake()?;
         self.session = Some(session);
         Ok(())
+    }
+
+    pub fn retry_connect(&mut self) -> Result<(), ConnectError> {
+        let ret = retry(Exponential::from(Duration::from_secs(5)), || {
+            match self.connect() {
+                Err(ConnectError::IOError(x)) => OperationResult::Retry(ConnectError::IOError(x)),
+                Err(ConnectError::HandshakeError(x)) => OperationResult::Err(ConnectError::HandshakeError(x)),
+                Err(ConnectError::AddrParseError(x)) => OperationResult::Err(ConnectError::AddrParseError(x)),
+                Ok(()) => OperationResult::Ok(()),
+            }
+        }).unwrap();
+        Ok(ret)
     }
 
     pub fn close (&mut self) -> Result<(), ()> {
